@@ -3,8 +3,26 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 
+# 📌 Appliquer un style personnalisé avec un fond vert foncé et du texte blanc
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #0b3d0b;
+        color: white;
+    }
+    .stApp {
+        background-color: #0b3d0b;
+        color: white;
+    }
+    h1, h2, h3, h4, h5, h6, p, div {
+        color: white !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # 📌 Charger les données
-
 def load_data():
     artists = pd.read_csv("datasets/artists_gp1.dat", delimiter="\t")
     user_artists = pd.read_csv("datasets/user_artists_gp1.dat", delimiter="\t")
@@ -19,12 +37,16 @@ def load_data():
     
     return artists, user_artists
 
+# Charger les données
 artists, user_artists = load_data()
 
 # 📌 Interface utilisateur
 st.title("🎶 Recommandation Musicale")
+
+# 🔹 Demander l'ID utilisateur AVANT de l'utiliser
 user_id = st.text_input("Veuillez entrer votre ID utilisateur :")
 
+# 📌 Chansons populaires associées aux artistes
 popular_songs = {
     "Lady Gaga": ["Bad Romance", "Poker Face", "Shallow"],
     "Britney Spears": ["...Baby One More Time", "Toxic", "Oops!... I Did It Again"],
@@ -38,6 +60,7 @@ popular_songs = {
     "Radiohead": ["No Surprises", "Creep", "Exit Music"]
 }
 
+# 🔹 Vérifier si l'ID utilisateur est renseigné avant d'exécuter le reste du code
 if user_id:
     user_history = user_artists[user_artists["userID"] == user_id]
     
@@ -46,22 +69,34 @@ if user_id:
         top_10_artists = (
             user_artists.groupby("artistID")["weight"]
             .sum()
-            .nlargest(10)
+            .nlargest(11)
             .reset_index()
         )
         
         top_10_artists = top_10_artists.merge(
             artists, left_on="artistID", right_on="id"
-        )[["artistID", "name", "pictureURL", "weight"]]
+        )[["artistID", "name", "weight"]]
 
         st.subheader("🎵 Top 10 artistes les plus écoutés")
-        for index, row in top_10_artists.iterrows():
-            st.markdown(f"**{index + 1}. {row['name']}**")
-            if pd.notna(row['pictureURL']):
-                st.image(row['pictureURL'], width=200)
-            songs = popular_songs.get(row['name'], ["Chanson 1", "Chanson 2", "Chanson 3"])
-            st.markdown(f"🎶 **Top Hits:** {', '.join(songs)}")
-        
+
+        # 📌 Affichage horizontal des artistes populaires avec les chansons en infobulle
+        st.write("Faites défiler vers la droite pour voir tous les artistes ⏩")
+        cols = st.columns(len(top_10_artists))
+
+        # 🔹 Création de l'affichage interactif
+        for col, (index, row) in zip(cols, top_10_artists.iterrows()):
+            artist_name = row['name']
+            songs = popular_songs.get(artist_name, ["Chanson 1", "Chanson 2", "Chanson 3"])
+            tooltip_text = f"🎶 {songs[0]}\n🎶 {songs[1]}\n🎶 {songs[2]}"
+
+            with col:
+                st.markdown(
+                    f'<div title="{tooltip_text}" style="cursor: pointer; padding: 10px; text-align: center; border-radius: 10px; border: 1px solid white; background-color: #1E1E1E;">'
+                    f'<strong>{index + 1} : {artist_name}</strong>'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+
         # 📌 Recommandations
         user_artist_matrix = user_artists.pivot(index="userID", columns="artistID", values="weight").fillna(0)
         
@@ -81,10 +116,11 @@ if user_id:
             
             recommended_artists = recommended_artists.merge(
                 artists, left_on="artistID", right_on="id"
-            )[["artistID", "name", "weight"]]
+            )[["artistID", "name"]]
             
             st.subheader("🎧 Recommandations pour vous")
-            st.dataframe(recommended_artists)
+            for index, row in recommended_artists.iterrows():
+                st.markdown(f"- {row['name']}")
         else:
             st.warning(f"L'utilisateur {user_id} n'est pas dans la matrice, impossible de générer des recommandations.")
     else:
